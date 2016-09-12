@@ -1,0 +1,62 @@
+[
+  {
+    "ParameterKey": "KeyName",
+    "ParameterValue": "<your private keyname>"
+  }, 
+  {
+    "ParameterKey": "VPCName",
+    "ParameterValue": "<your vpc id>"
+  }, 
+  {
+    "ParameterKey": "SecurityGroup1",
+    "ParameterValue": "<security group1 id>"
+  }, 
+  {
+    "ParameterKey": "SecurityGroup2",
+    "ParameterValue": "<security group2 id>"
+  }, 
+  {
+    "ParameterKey": "SecurityGroup3",
+    "ParameterValue": "<security group3 id>"
+  }, 
+  {
+    "ParameterKey": "AVSubnet",
+    "ParameterValue": "<your subnet id>"
+  }, 
+  {
+    "ParameterKey": "AZName",
+    "ParameterValue": "us-east-1b"
+  }, 
+  {
+    "ParameterKey": "IAMProfile",
+    "ParameterValue": "<your iam profile>"
+  }, 
+  {
+    "ParameterKey": "AVInstanceName",
+    "ParameterValue": "av_worker_"
+  }, 
+  {
+    "ParameterKey": "AVLocationName",
+    "ParameterValue": "us_east"
+  }, 
+  {
+    "ParameterKey": "EC2InstanceType",
+    "ParameterValue": "m1.small"
+  },
+  {
+    "ParameterKey": "SNSDisplayName",
+    "ParameterValue": "clamavfindings"
+  },
+  {
+    "ParameterKey": "S3BucketURL",
+    "ParameterValue": "<your s3 bucket name>"
+  },
+  {
+    "ParameterKey": "DeleteInfectedFilesParams",
+    "ParameterValue": "true"
+  },
+  {
+    "ParameterKey": "AMIId",
+    "ParameterValue": "<your ami id>"
+  }
+]

@@ -1,0 +1,189 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+    "Description" : "Stack to implement AWS S3 bucket virus scan using ClamAV",
+    "Parameters" : {
+      "KeyName": {
+        "Description" : "Name of an existing EC2 KeyPair to enable SSH access to the instances",
+        "Type": "String"
+      },
+      "VPCName" : {
+        "Description": "The VPC ID we are deploying to",
+        "Type" : "String"
+      },
+      "SecurityGroup1": {
+        "Description" : "The default VPC security group Id for instances",
+        "Type": "String"
+      },
+      "SecurityGroup2": {
+        "Description" : "The security group Id for outbound internet access for instances",
+        "Type": "String"
+      },
+      "SecurityGroup3" : {
+        "Description" : "Security Group for ssh access etc.",
+        "Type" : "String"
+      },
+      "AVSubnet" : {
+        "Description" : "Id of the private subnet1",
+        "Type" : "String"
+      },
+      "AZName" : {
+        "Description" : "Name of the 1st AZ being used. us-east-1a",
+        "Type" : "String"
+      }, 
+      "AMIId" : {
+        "Description" : "The Foundation AMI Id for the instances.",
+        "Type" : "String"
+      },
+      "IAMProfile" : {
+        "Description" : "IAM Profile/Role",
+        "Type" : "String"
+      },
+      "AVInstanceName" : {
+        "Description" : "Instance Name",
+        "Type" : "String"
+      },
+      "AVLocationName" : {
+        "Description" : "Instance Location Name",
+        "Type" : "String"
+      },
+      "SNSDisplayName" : {
+        "Description" : "Simple Notification Display Name",
+        "Type" : "String"
+      },
+      "S3BucketURL" : {
+        "Description" : "S3 Bucket absolute path",
+        "Type" : "String"
+      },
+      "DeleteInfectedFilesParams" : {
+        "Description" : "Default config value for delete the infected files on s3",
+        "Type" : "String"
+      },
+      "EC2InstanceType" : {
+        "Description" : "Instance type for nodes",
+        "Type" : "String"
+      }
+    },
+    "Resources": {
+      "ClamAVSNSTopic": {
+        "Type" : "AWS::SNS::Topic",
+        "Properties": {
+          "TopicName": {
+            "Ref": "SNSDisplayName"
+          },
+          "Subscription": [ {
+            "Endpoint": "luis.lavinajr@infor.com",
+            "Protocol": "email"
+          } ]
+        }
+      },
+      "S3FilesQueue": {
+        "Type": "AWS::SQS::Queue",
+        "Properties": {
+          "VisibilityTimeout": 300,
+          "RedrivePolicy": {
+            "deadLetterTargetArn": {"Fn::GetAtt": ["S3FilesQueueDLQ", "Arn"]},
+            "maxReceiveCount": 3
+          }
+        }
+      },
+      "S3FilesQueuePolicy": {
+        "Type": "AWS::SQS::QueuePolicy",
+        "Properties": {
+          "PolicyDocument": {
+            "Version": "2008-10-17",
+            "Statement": [{
+              "Effect": "Allow",
+              "Principal": {
+                "AWS":"*"
+              },
+              "Action": [
+                "SQS:SendMessage"
+                ],
+              "Resource": {"Fn::GetAtt": ["S3FilesQueue", "Arn"]}
+            }]
+          },
+          "Queues": [{"Ref": "S3FilesQueue"}]
+        }
+      },
+      "S3FilesQueueDLQ": {
+        "Type": "AWS::SQS::Queue",
+        "Properties": {
+          "MessageRetentionPeriod": 1209600
+        }
+      },
+      "AVAutoScalingGroup": {
+        "Type": "AWS::AutoScaling::AutoScalingGroup",
+        "Properties": {
+          "AvailabilityZones": [ { "Ref" : "AZName" } ],
+          "LaunchConfigurationName": {
+            "Ref": "AVLaunchConfig"
+          },
+          "MaxSize": "1",
+          "MinSize": "1",
+          "VPCZoneIdentifier": [ { "Ref": "AVSubnet" } ],
+          "Tags" : [ 
+          {
+            "Key" : "Name",
+            "Value" : { "Fn::Join" : [ "", [ { "Ref" : "AVInstanceName" }, { "Ref" : "AVLocationName" } ] ] }, 
+            "PropagateAtLaunch" : "true"
+          }, {
+            "Key" : "Service",
+            "Value" : "clamav-antivirus",
+            "PropagateAtLaunch" : "true"
+          }
+          ]
+        }   
+      },
+      "AVLaunchConfig": {
+        "Type": "AWS::AutoScaling::LaunchConfiguration",
+        "Properties": {
+          "IamInstanceProfile": { 
+            "Ref" : "IAMProfile" 
+          },
+          "AssociatePublicIpAddress": false,
+          "ImageId": {
+            "Ref": "AMIId"
+          },
+          "InstanceType": { "Ref" : "EC2InstanceType" },
+          "KeyName": {
+            "Ref": "KeyName"
+          },
+          "SecurityGroups": [
+          { "Ref" : "SecurityGroup1" },
+          { "Ref" : "SecurityGroup2" },
+          { "Ref" : "SecurityGroup3" }
+          ],
+            "BlockDeviceMappings" : [ {
+              "DeviceName": "/dev/xvda",
+              "Ebs": {
+                "DeleteOnTermination": true,
+                "VolumeSize": 80,
+                "VolumeType": "gp2"
+              }}, { 
+                "DeviceName" : "/dev/xvdf",
+                "Ebs" : {
+                  "VolumeType" : "gp2",
+                  "DeleteOnTermination" : "true",
+                  "VolumeSize" : "30"
+                }} 
+                ],
+                  "UserData" : { "Fn::Base64" : { "Fn::Join" : ["", [
+                    "#!/bin/bash -v\n",
+                    "/usr/bin/aws s3 cp s3://", { "Ref" : "S3BucketURL" }, "/salt-s3-virusscan.tar.gz /tmp/salt-s3-virusscan.tar.gz\n ",
+                    "cd /tmp && tar -xzf salt-s3-virusscan.tar.gz\n ",
+                    "mv /tmp/salt-s3virusscan /srv/salt\n ",
+                    "/bin/sh /srv/salt/set_me_up.sh\n ",
+                    "echo deleteparams: ", { "Ref" : "DeleteInfectedFilesParams" },  " >>/etc/salt/grains\n",
+                    "echo n_region: ", { "Ref" : "AWS::Region" },  " >>/etc/salt/grains\n",
+                    "echo n_queue: ", { "Ref" : "S3FilesQueue" },  " >>/etc/salt/grains\n",
+                    "echo n_topic: ", { "Ref" : "ClamAVSNSTopic" },  " >>/etc/salt/grains\n",
+                    "salt-call --local saltutil.sync_all\n",
+                    "salt-call --local state.highstate\n"
+                      ]]}}
+
+        }
+      }
+    },
+    "Outputs" : {
+    }
+}
