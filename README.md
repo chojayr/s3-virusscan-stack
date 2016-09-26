@@ -27,4 +27,4 @@
    $ aws cloudformation create-stack --stack-name <value> --template-body file://s3_virusscan_template.json --parameters file://s3_virusscan_params.json 
 
 ## Full Details 
-For more details of the implementation kindly go [here](https://codebase.com) 
+For more details of the implementation kindly go [here](https://chojayr.github.io/2016-08-18-s3virusscan/) 
